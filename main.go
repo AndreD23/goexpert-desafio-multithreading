@@ -45,6 +45,7 @@ func main() {
 		panic(err)
 	}
 	fmt.Println("Retorno BrasilAPI", returnBuscaBrasilAPI)
+	fmt.Println("Done")
 }
 
 func fetchCepData(url string, target interface{}) error {
