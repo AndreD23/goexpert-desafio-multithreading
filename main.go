@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type CepData struct {
@@ -34,18 +35,21 @@ type BrasilAPI struct {
 
 func main() {
 	cep := "05187010"
-	returnViaCep, err := BuscaViaCep(cep)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("Retorno ViaCEP", returnViaCep)
 
-	returnBuscaBrasilAPI, err := BuscaBrasilAPI(cep)
-	if err != nil {
-		panic(err)
+	cepViaCep := make(chan *CepData)
+	cepBrasilAPI := make(chan *CepData)
+
+	go BuscaViaCep(cep, cepViaCep)
+	go BuscaBrasilAPI(cep, cepBrasilAPI)
+
+	select {
+	case mgs1 := <-cepViaCep:
+		fmt.Println("ViaCEP", mgs1)
+	case msg2 := <-cepBrasilAPI:
+		fmt.Println("BrasilAPI", msg2)
+	case <-time.After(time.Second * 1):
+		fmt.Println("Timeout")
 	}
-	fmt.Println("Retorno BrasilAPI", returnBuscaBrasilAPI)
-	fmt.Println("Done")
 }
 
 func fetchCepData(url string, target interface{}) error {
@@ -68,22 +72,22 @@ func fetchCepData(url string, target interface{}) error {
 	return nil
 }
 
-func BuscaViaCep(cep string) (*ViaCEP, error) {
+func BuscaViaCep(cep string, cepData chan<- *CepData) {
 	url := "https://viacep.com.br/ws/" + cep + "/json/"
 	var data ViaCEP
 	err := fetchCepData(url, &data)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return &data, nil
+	cepData <- &data.CepData
 }
 
-func BuscaBrasilAPI(cep string) (*BrasilAPI, error) {
+func BuscaBrasilAPI(cep string, cepData chan<- *CepData) {
 	url := "https://brasilapi.com.br/api/cep/v1/" + cep
 	var data BrasilAPI
 	err := fetchCepData(url, &data)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	data.CepData = CepData{
@@ -93,5 +97,6 @@ func BuscaBrasilAPI(cep string) (*BrasilAPI, error) {
 		Localidade: data.City,
 		Uf:         data.State,
 	}
-	return &data, nil
+
+	cepData <- &data.CepData
 }
